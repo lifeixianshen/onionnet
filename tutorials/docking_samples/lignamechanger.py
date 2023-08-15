@@ -35,58 +35,47 @@ class rewritePDB(object):
         atomseq = int(atomStartNdx)
         chainname = chain
 
-        newfile = open(output,'w')
-        resseq_list = []
+        with open(output,'w') as newfile:
+            resseq_list = []
 
-        try :
-            with open(input) as lines :
-                for s in lines :
-                    if "ATOM" in s and len(s.split()) > 6 :
-                        atomseq += 1
-                        newline = s
-                        newline = self.atomSeqChanger(newline, atomseq)
-                        newline = self.chainIDChanger(newline, chainname)
-                        if len(resseq_list) == 0 :
+            try:
+                with open(input) as lines:
+                    for s in lines:
+                        if "ATOM" in s and len(s.split()) > 6:
+                            atomseq += 1
+                            newline = s
+                            newline = self.atomSeqChanger(newline, atomseq)
+                            newline = self.chainIDChanger(newline, chainname)
+                            if resseq_list:
+                                if resseq_list[-1] != int(s[22:26].strip()):
+                                    resseq += 1
                             newline = self.resSeqChanger(newline, resseq)
                             resseq_list.append(int(s[22:26].strip()))
-                        else :
-                            if resseq_list[-1] == int(s[22:26].strip()) :
-                                newline = self.resSeqChanger(newline, resseq)
-                            else :
-                                resseq += 1
-                                newline = self.resSeqChanger(newline, resseq)
-                            resseq_list.append(int(s[22:26].strip()))
-                        newfile.write(newline)
-                    else :
-                        newfile.write(s)
-        except FileExistsError :
-            print("File %s not exist" % self.pdb)
+                            newfile.write(newline)
+                        else:
+                            newfile.write(s)
+            except FileExistsError:
+                print(f"File {self.pdb} not exist")
 
-        newfile.close()
         return 1
 
     def resSeqChanger(self, inline, resseq):
         resseqstring = " "*(4 - len(str(resseq)))+str(resseq)
-        newline = inline[:22] + resseqstring + inline[26:]
-        return newline
+        return inline[:22] + resseqstring + inline[26:]
 
     def atomSeqChanger(self, inline, atomseq):
         atomseqstring = " " * (5 - len(str(atomseq))) + str(atomseq)
-        newline = inline[:6] + atomseqstring + inline[11:]
-        return newline
+        return inline[:6] + atomseqstring + inline[11:]
 
     def resNameChanger(self, inline, resname):
         resnamestr = " " * (4 - len(str(resname))) + str(resname)
-        newline = inline[:16] + resnamestr + inline[20:]
-        return newline
+        return inline[:16] + resnamestr + inline[20:]
 
-    def chainIDChanger(self, inline, chainid) :
-        newline = inline[:21] + str(chainid) + inline[22:]
-        return newline
+    def chainIDChanger(self, inline, chainid):
+        return inline[:21] + str(chainid) + inline[22:]
 
     def atomNameChanger(self, inline, new_atom_name):
-        newline = inline[:12] + "%4s" % new_atom_name + inline[16:]
-        return newline
+        return inline[:12] + "%4s" % new_atom_name + inline[16:]
 
     def combinePDBFromLines(self, output, lines):
         """
@@ -128,28 +117,27 @@ class rewritePDB(object):
 
         """
 
-        tofile = open("temp.pdb", 'w')
+        with open("temp.pdb", 'w') as tofile:
+            crd_list = {}
 
-        crd_list = {}
+            ln_target, ln_source = 0, 0
+            # generate a dict { atomname: pdbline}
+            with open(input) as lines :
+                for s in [x for x in lines if ("ATOM" in x or "HETATM" in x)]:
+                    crd_list[s.split()[2]] = s
+                    ln_source += 1
 
-        ln_target, ln_source = 0, 0
-        # generate a dict { atomname: pdbline}
-        with open(input) as lines :
-            for s in [x for x in lines if ("ATOM" in x or "HETATM" in x)]:
-                crd_list[s.split()[2]] = s
-                ln_source += 1
-
-        # reorder the crd_pdb pdblines, according to the atomseq_pdb lines
-        with open(atomseq_pdb) as lines:
-            for s in [x for x in lines if ("ATOM" in x or "HETATM" in x)]:
-                newline = crd_list[s.split()[2]]
-                tofile.write(newline)
-                ln_target += 1
-
-        tofile.close()
+            # reorder the crd_pdb pdblines, according to the atomseq_pdb lines
+            with open(atomseq_pdb) as lines:
+                for s in [x for x in lines if ("ATOM" in x or "HETATM" in x)]:
+                    newline = crd_list[s.split()[2]]
+                    tofile.write(newline)
+                    ln_target += 1
 
         if ln_source != ln_target:
-            print("Error: Number of lines in source and target pdb files are not equal. (%s %s)"%(input, atomseq_pdb))
+            print(
+                f"Error: Number of lines in source and target pdb files are not equal. ({input} {atomseq_pdb})"
+            )
 
         # re-sequence the atom index
         self.pdbRewrite(input="temp.pdb", atomStartNdx=1, chain=chain, output=out_pdb, resStartNdx=1)
@@ -161,15 +149,14 @@ class rewritePDB(object):
 def lig_name_change(lig_in, lig_out, lig_code):
 
     pio = rewritePDB(lig_in)
-    tofile = open(lig_out, "w")
-    with open(lig_in) as lines:
-        for s in lines:
-            if len(s.split()) and s.split()[0] in ['ATOM', 'HETATM']:
-                nl = pio.resNameChanger(s, lig_code)
-                #n2 = pio.chainIDChanger(nl, "Z")
-                tofile.write(nl)
+    with open(lig_out, "w") as tofile:
+        with open(lig_in) as lines:
+            for s in lines:
+                if len(s.split()) and s.split()[0] in ['ATOM', 'HETATM']:
+                    nl = pio.resNameChanger(s, lig_code)
+                    #n2 = pio.chainIDChanger(nl, "Z")
+                    tofile.write(nl)
 
-    tofile.close()
     return None
 
 def main():
@@ -185,7 +172,7 @@ def main():
             lig_name_change(lig, out, "LIG")
 
         else:
-            os.system("cp %s temp"%(lig))
+            os.system(f"cp {lig} temp")
 
 main()
 

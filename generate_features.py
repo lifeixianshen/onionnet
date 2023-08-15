@@ -179,10 +179,7 @@ class AtomTypeCounts(object):
 
 def get_elementtype(e):
     all_elements = ["H", "C", "O", "N", "P", "S", "Cl", "DU"]
-    if e in all_elements:
-        return e
-    else:
-        return "DU"
+    return e if e in all_elements else "DU"
 
 
 def generate_features(complex_fn, lig_code, ncutoffs):
@@ -332,9 +329,7 @@ if __name__ == "__main__":
     except IndexError:
         df.index = np.arange(df.shape[0])
 
-    col_n = []
-    for i, n in enumerate(keys * len(n_cutoffs)):
-        col_n.append(n + "_" + str(i))
+    col_n = [n + "_" + str(i) for i, n in enumerate(keys * len(n_cutoffs))]
     df.columns = col_n
     df.to_csv(args.out, sep=",", float_format="%.1f", index=True)
 
